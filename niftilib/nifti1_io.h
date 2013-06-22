@@ -63,6 +63,52 @@ typedef struct {                   /** 3x3 matrix struct **/
   float m[3][3] ;
 } mat33 ;
 
+/********************** MiND Data Structures **************************/
+typedef enum _mind_codes {
+  MIND_NONE = 0,
+  MIND_RAWDWI = 1,
+  MIND_DTENSOR = 2,
+  MIND_DISCSPHFUNC = 3,
+  MIND_REALSPHARMCOEFFS = 4
+} NiftiMindCode;
+
+typedef struct 
+{
+	float azimuth;
+	float zenith;
+	float bvalue;
+	int pad;
+} NiftiRawDWI;
+
+typedef struct 
+{
+	int row;
+	int col;
+	int pad[2];
+} NiftiTensorPos;
+
+typedef struct 
+{
+	float azimuth;
+	float zenith;
+	int pad[2];
+} NiftiMeshPoint;
+
+typedef struct 
+{
+	int degree;
+	int order;
+	int pad[2];
+} NiftiSphereHarmonic;
+
+typedef union {
+	char data[16];
+	NiftiRawDWI diff_dir;
+	NiftiTensorPos tensor_index;
+	NiftiMeshPoint sph_point;
+	NiftiSphereHarmonic sph_order;
+} NiftiMindExt; 
+
 /*...........................................................................*/
 
 /*! \enum analyze_75_orient_code
@@ -428,6 +474,10 @@ int  * nifti_get_intlist     (int nvals , const char *str);
 char * nifti_strdup          (const char *str);
 int    valid_nifti_extensions(const nifti_image *nim);
 
+/* MiND Extension Functions */
+NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr);
+int nifti_add_mind(nifti_image* nim, NiftiMindCode type, NiftiMindExt* mind_arr,
+			size_t sz);;
 
 /*-------------------- Some C convenience macros ----------------------------*/
 

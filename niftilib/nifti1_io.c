@@ -336,9 +336,10 @@ static char const * const gni_history[] =
   "   - fixed znzread/write, noting example by M Adler\n"
   "   - changed nifti_swap_* routines/calls to take size_t (6)\n"
   "1.43 07 Jul 2010 [rickr]: fixed znzR/W to again return nmembers\n",
+  "1.44 TBD\n",
   "----------------------------------------------------------------------\n"
 };
-static const char gni_version[] = "nifti library version 1.39 (23 June, 2009)";
+static const char gni_version[] = "nifti library version 1.44 (XX June, 2013)";
 
 /*! global nifti options structure - init with defaults */
 static nifti_global_options g_opts = {
@@ -4477,6 +4478,230 @@ static int nifti_read_extensions( nifti_image *nim, znzFile fp, int remain )
    return count;
 }
 
+/**
+ * @brief Takes an array of MindExt's and adds them into the image ext
+ *
+ * Adds to the ext_list for the given MindExt, and sets intent name according
+ * to mind standard
+ *
+ * @param nim	input nifti image 
+ * @param type 	type of mind data to write
+ * @param mind_arr 	array of mind structures, alloc'd and size nu
+ *
+ * @return 0
+ */
+int nifti_add_mind(nifti_image* nim, NiftiMindCode type, NiftiMindExt* mind_arr, size_t sz)
+{
+	int ii;
+
+	if(nim->du != sz) {
+		fprintf(stderr,"MiND Output, Trying to pass MiND extension data into "
+				"non-vector image. Set dim[5] (du) > 1.\n");
+		return -1;
+	}
+	
+	if(nim->intent_code != NIFTI_INTENT_VECTOR) {
+		fprintf(stderr,"MiND Output, Trying to pass MiND extension data into "
+				"non-vector image. Intent to 1007 (NIFTI_INTENT_VECTOR).\n");
+		return -1;
+	}
+	strncpy(nim->intent_name, "MiND", 4);
+
+	//todo: may need to add a hack where nt and nu are swapped
+	//and the data type gets set to vector type
+
+	if(mind_arr == NULL) {
+		fprintf(stderr,"MiND Input, Error passed null pointer, crashing.\n");
+		return -1;
+	}
+
+	/* MiND Extensions */
+	switch(type) {
+		case MIND_RAWDWI:
+			nifti_add_extension(nim, "RAWDWI", 7, NIFTI_ECODE_MIND_IDENT);
+			for(ii = 0 ; ii < sz; ii++) {
+				nifti_add_extension(nim, (char*)&mind_arr[ii].diff_dir.bvalue,
+						sizeof(int), NIFTI_ECODE_B_VALUE);
+				nifti_add_extension(nim, (char*)&mind_arr[ii].diff_dir.azimuth,
+						sizeof(float)*2, NIFTI_ECODE_SPHERICAL_DIRECTION);
+			}
+		break;
+		case MIND_DTENSOR:
+			nifti_add_extension(nim, "DTENSOR", 8, NIFTI_ECODE_MIND_IDENT);
+			for(ii = 0 ; ii < sz; ii++) {
+				nifti_add_extension(nim, (char*)&mind_arr[ii].tensor_index.row,
+						sizeof(int)*2, NIFTI_ECODE_DT_COMPONENT);
+			}
+		break;
+		case MIND_DISCSPHFUNC:
+			nifti_add_extension(nim, "DISCSPHFUNC", 12, NIFTI_ECODE_MIND_IDENT);
+			for(ii = 0 ; ii < sz; ii++) {
+				nifti_add_extension(nim, (char*)&mind_arr[ii].sph_point.azimuth, 
+						sizeof(float)*2, NIFTI_ECODE_SPHERICAL_DIRECTION);
+			}
+		break;
+		case MIND_REALSPHARMCOEFFS:
+			nifti_add_extension(nim, "REALSPHARMCOEFFS", 17, NIFTI_ECODE_MIND_IDENT);
+			for(ii = 0 ; ii < sz; ii++) {
+				nifti_add_extension(nim, (char*)&mind_arr[ii].sph_order.degree, 
+						sizeof(float)*2, NIFTI_ECODE_SHC_DEGREEORDER);
+			}
+		break;
+		default:
+			fprintf(stderr,"MiND Output, Unknown MiND type passed: %i.\n", type);
+			return -1;
+
+	}
+	return 0;
+}
+
+/**
+ * @brief Parses nifti extensions and returns an array of mind data structures
+ *
+ * Parses the list of nifti extensions and if any mind data structures are 
+ * present creates an array of size nu. 
+ *
+ * "Multi-Mind" is not supported. If you want to maintain data provenence then 
+ * do it using sound file storage methods and file naming.
+ * I've heard "directories" and non-inode based "file names" are useful and 
+ * available in the latest operating systems
+ *
+ * @param nim	input nifti image 
+ * @param mind_arr array of mind structures, alloc'd and size nu
+ *
+ * @return mind_code that was found, 0 = none, -1 = error
+ */
+NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr)
+{
+	if(strcmp(nim->intent_name, "MiND") != 0) 
+		return 0;
+
+	int swap = nim->byteorder != nifti_short_order();
+	int cnt = 0;
+	int ee;
+	NiftiMindCode type = MIND_NONE;
+
+	if(mind_arr == NULL) {
+		fprintf(stderr,"MiND Input, Error passed null pointer, crashing.");
+		return -1;
+	}
+
+	//alloc
+	if(*mind_arr != NULL) {
+		if( g_opts.debug > 0 )
+			fprintf(stderr,"MiND Input, Warning: passed non-null pointer, memory"
+					" may be lost.");
+	}
+	*mind_arr = malloc(sizeof(NiftiMindExt)*nim->nu); 
+	if(*mind_arr == NULL) {
+		fprintf(stderr,"MiND Input, failed to allocate enough memory.");
+		return -1;
+	}
+
+	//iterator through metadata
+	nifti1_extension* nex = nim->ext_list;
+
+	/* MiND Extensions */
+	for(ee = 0 ; ee < nim->num_ext; ee++) {
+		switch(nex->ecode) {
+			case NIFTI_ECODE_MIND_IDENT:
+				if(type != MIND_NONE) {
+					fprintf(stderr,"MiND Input, error, multi-mind unsupported.");
+					free(*mind_arr);
+					*mind_arr = NULL;
+					return -1;
+				}
+
+				if(!strncmp(nex->edata, "RAWDWI", sizeof("RAWDWI")-1)) 
+					type = MIND_RAWDWI;
+				else if(!strncmp(nex->edata, "DTENSOR", sizeof("DTENSOR")-1)) 
+					type = MIND_DTENSOR;
+				else if(!strncmp(nex->edata, "DISCSPHFUNC", sizeof("DISCSPHFUNC")-1)) 
+					type = MIND_DISCSPHFUNC;
+				else if(!strncmp(nex->edata, "REALSPHARMCOEFFS", sizeof("REALSPHARMCOEFFS")-1))
+					type = MIND_REALSPHARMCOEFFS;
+
+				break;
+			case NIFTI_ECODE_B_VALUE:
+				if(swap)
+					nifti_swap_4bytes(1, nex->edata);
+
+				if(type != MIND_RAWDWI) {
+					fprintf(stderr,"MiND Input, error mismatched mind type data "
+							"in input file");
+					free(*mind_arr);
+					*mind_arr = NULL;
+					return -1;
+				}
+
+				memcpy(&(*mind_arr)[cnt].diff_dir.bvalue, nex->edata, 4);
+				break;
+			case NIFTI_ECODE_SPHERICAL_DIRECTION:
+				if(type != MIND_RAWDWI || type != MIND_DISCSPHFUNC) {
+					fprintf(stderr,"MiND Input, error mismatched mind type data "
+							"in input file");
+					free(*mind_arr);
+					*mind_arr = NULL;
+					return -1;
+				}
+
+				if(swap) 
+					nifti_swap_4bytes(2, nex->edata);
+
+				memcpy(&(*mind_arr)[cnt].sph_point.azimuth, nex->edata, 4);
+				memcpy(&(*mind_arr)[cnt].sph_point.zenith, nex->edata+4, 4);
+
+				cnt++;
+				break;
+			case NIFTI_ECODE_DT_COMPONENT:
+				if(type != MIND_DTENSOR) {
+					fprintf(stderr,"MiND Input, error mismatched mind type data "
+							"in input file");
+					free(*mind_arr);
+					*mind_arr = NULL;
+					return -1;
+				}
+
+				if(swap) 
+					nifti_swap_4bytes(2, nex->edata);
+
+				memcpy(&(*mind_arr)[cnt].tensor_index.row , nex->edata, 4);
+				memcpy(&(*mind_arr)[cnt].tensor_index.col, nex->edata+4, 4);
+
+				cnt++;
+				break;
+			case NIFTI_ECODE_SHC_DEGREEORDER:
+				if(type != MIND_REALSPHARMCOEFFS) {
+					fprintf(stderr,"MiND Input, error mismatched mind type data "
+							"in input file");
+					free(*mind_arr);
+					*mind_arr = NULL;
+					return -1;
+				}
+
+				if(swap) 
+					nifti_swap_4bytes(2, nex->edata);
+
+				memcpy(&(*mind_arr)[cnt].sph_order.degree, nex->edata, 4);
+				memcpy(&(*mind_arr)[cnt].sph_order.order, nex->edata+4, 4);
+
+				cnt++;
+				break;
+		}
+
+		//check size of mind header and ensure that it does not overrun
+		if(cnt >= nim->nu) {
+			fprintf(stderr,"Too many MiND extended header fields for vector size.");
+			free(*mind_arr);
+			*mind_arr = NULL;
+			return -1;
+		}
+
+		nex = (nifti1_extension*)(((char*)nex) + nex->esize);
+	}
+		
+	return 0;
+}
 
 /*----------------------------------------------------------------------*/
 /*! nifti_add_extension - add an extension, with a copy of the data
