@@ -4626,9 +4626,6 @@ NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr)
 
 				break;
 			case NIFTI_ECODE_B_VALUE:
-				if(swap)
-					nifti_swap_4bytes(1, nex->edata);
-
 				//check for consistency with labeled type
 				if(type != MIND_RAWDWI) {
 					fprintf(stderr,"MiND Input, error mismatched mind type data "
@@ -4645,6 +4642,9 @@ NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr)
 					*mind_arr = NULL;
 					return -1;
 				}
+
+				if(swap)
+					nifti_swap_4bytes(1, nex->edata);
 
 				memcpy(&(*mind_arr)[b_cnt].diff_dir.bvalue, nex->edata, 4);
 				b_cnt++;
@@ -4731,9 +4731,9 @@ NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr)
 				break;
 		}
 
-		nex = (nifti1_extension*)(((char*)nex) + nex->esize);
+		nex++;
 	}
-		
+	
 	return type;
 }
 
