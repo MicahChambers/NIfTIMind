@@ -10,6 +10,9 @@ TARGET_LINK_LIBRARIES(first_test niftiio )
 ADD_EXECUTABLE(second_test nifti_test2.c)
 TARGET_LINK_LIBRARIES(second_test niftiio )
 
+ADD_EXECUTABLE(third_test nifti_mind_test.c)
+TARGET_LINK_LIBRARIES(third_test niftiio )
 
-ADD_TEST(first_test first_test )
+
+ADD_TEST(first_test first_test third_test)
 

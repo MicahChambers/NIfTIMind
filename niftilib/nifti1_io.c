@@ -4577,7 +4577,10 @@ NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr)
 		return 0;
 
 	int swap = nim->byteorder != nifti_short_order();
-	int cnt = 0;
+	int b_cnt = 0;
+	int dir_cnt = 0;
+	int dti_cnt = 0;
+	int shell_cnt = 0;
 	int ee;
 	NiftiMindCode type = MIND_NONE;
 
@@ -4626,6 +4629,7 @@ NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr)
 				if(swap)
 					nifti_swap_4bytes(1, nex->edata);
 
+				//check for consistency with labeled type
 				if(type != MIND_RAWDWI) {
 					fprintf(stderr,"MiND Input, error mismatched mind type data "
 							"in input file");
@@ -4634,12 +4638,30 @@ NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr)
 					return -1;
 				}
 
-				memcpy(&(*mind_arr)[cnt].diff_dir.bvalue, nex->edata, 4);
+				//check size of mind header and ensure that it does not overrun
+				if(b_cnt >= nim->nu) {
+					fprintf(stderr,"Too many MiND extended header fields for vector size.");
+					free(*mind_arr);
+					*mind_arr = NULL;
+					return -1;
+				}
+
+				memcpy(&(*mind_arr)[b_cnt].diff_dir.bvalue, nex->edata, 4);
+				b_cnt++;
+
 				break;
 			case NIFTI_ECODE_SPHERICAL_DIRECTION:
-				if(type != MIND_RAWDWI || type != MIND_DISCSPHFUNC) {
+				if(type != MIND_RAWDWI && type != MIND_DISCSPHFUNC) {
 					fprintf(stderr,"MiND Input, error mismatched mind type data "
 							"in input file");
+					free(*mind_arr);
+					*mind_arr = NULL;
+					return -1;
+				}
+				
+				//check size of mind header and ensure that it does not overrun
+				if(dir_cnt >= nim->nu) {
+					fprintf(stderr,"Too many MiND extended header fields for vector size.");
 					free(*mind_arr);
 					*mind_arr = NULL;
 					return -1;
@@ -4648,12 +4670,14 @@ NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr)
 				if(swap) 
 					nifti_swap_4bytes(2, nex->edata);
 
-				memcpy(&(*mind_arr)[cnt].sph_point.azimuth, nex->edata, 4);
-				memcpy(&(*mind_arr)[cnt].sph_point.zenith, nex->edata+4, 4);
+				memcpy(&(*mind_arr)[dir_cnt].sph_point.azimuth, nex->edata, 4);
+				memcpy(&(*mind_arr)[dir_cnt].sph_point.zenith, nex->edata+4, 4);
 
-				cnt++;
+				dir_cnt++;
 				break;
 			case NIFTI_ECODE_DT_COMPONENT:
+				
+				//check for consistency with labeled type
 				if(type != MIND_DTENSOR) {
 					fprintf(stderr,"MiND Input, error mismatched mind type data "
 							"in input file");
@@ -4661,19 +4685,10 @@ NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr)
 					*mind_arr = NULL;
 					return -1;
 				}
-
-				if(swap) 
-					nifti_swap_4bytes(2, nex->edata);
-
-				memcpy(&(*mind_arr)[cnt].tensor_index.row , nex->edata, 4);
-				memcpy(&(*mind_arr)[cnt].tensor_index.col, nex->edata+4, 4);
-
-				cnt++;
-				break;
-			case NIFTI_ECODE_SHC_DEGREEORDER:
-				if(type != MIND_REALSPHARMCOEFFS) {
-					fprintf(stderr,"MiND Input, error mismatched mind type data "
-							"in input file");
+				
+				//check size of mind header and ensure that it does not overrun
+				if(dti_cnt >= nim->nu) {
+					fprintf(stderr,"Too many MiND extended header fields for vector size.");
 					free(*mind_arr);
 					*mind_arr = NULL;
 					return -1;
@@ -4682,25 +4697,44 @@ NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr)
 				if(swap) 
 					nifti_swap_4bytes(2, nex->edata);
 
-				memcpy(&(*mind_arr)[cnt].sph_order.degree, nex->edata, 4);
-				memcpy(&(*mind_arr)[cnt].sph_order.order, nex->edata+4, 4);
+				memcpy(&(*mind_arr)[dti_cnt].tensor_index.row , nex->edata, 4);
+				memcpy(&(*mind_arr)[dti_cnt].tensor_index.col, nex->edata+4, 4);
 
-				cnt++;
+				dti_cnt++;
 				break;
-		}
+			case NIFTI_ECODE_SHC_DEGREEORDER:
+				
+				//check for consistency with labeled type
+				if(type != MIND_REALSPHARMCOEFFS) {
+					fprintf(stderr,"MiND Input, error mismatched mind type data "
+							"in input file");
+					free(*mind_arr);
+					*mind_arr = NULL;
+					return -1;
+				}
+				
+				//check size of mind header and ensure that it does not overrun
+				if(shell_cnt >= nim->nu) {
+					fprintf(stderr,"Too many MiND extended header fields for vector size.");
+					free(*mind_arr);
+					*mind_arr = NULL;
+					return -1;
+				}
 
-		//check size of mind header and ensure that it does not overrun
-		if(cnt >= nim->nu) {
-			fprintf(stderr,"Too many MiND extended header fields for vector size.");
-			free(*mind_arr);
-			*mind_arr = NULL;
-			return -1;
+				if(swap) 
+					nifti_swap_4bytes(2, nex->edata);
+
+				memcpy(&(*mind_arr)[shell_cnt].sph_order.degree, nex->edata, 4);
+				memcpy(&(*mind_arr)[shell_cnt].sph_order.order, nex->edata+4, 4);
+
+				shell_cnt++;
+				break;
 		}
 
 		nex = (nifti1_extension*)(((char*)nex) + nex->esize);
 	}
 		
-	return 0;
+	return type;
 }
 
 /*----------------------------------------------------------------------*/
