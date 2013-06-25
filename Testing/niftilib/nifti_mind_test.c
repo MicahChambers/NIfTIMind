@@ -284,19 +284,19 @@ int main (int argc, char *argv[])
 {
 	//Raw DWI
 	generate_rawdwi_image("rawdwi.nii.gz", 13);
-	if(check_image("rawdwi.nii.gz", 13) != 0) 
+	if(check_image("mind_rawdwi.nii.gz", 13) != 0) 
 		return EXIT_FAILURE;
 	
 	generate_tensor_image("tensor.nii.gz", 13);
-	if(check_image("tensor.nii.gz", 13) != 0)
+	if(check_image("mind_tensor.nii.gz", 13) != 0)
 		return EXIT_FAILURE;
 	
 	generate_hsphere_image("hsphere.nii.gz", 13);
-	if(check_image("hsphere.nii.gz", 13) != 0) 
+	if(check_image("mind_hsphere.nii.gz", 13) != 0) 
 		return EXIT_FAILURE;
 	
 	generate_dsphere_image("dsphere.nii.gz", 13);
-	if(check_image("dsphere.nii.gz", 13) != 0) 
+	if(check_image("mind_dsphere.nii.gz", 13) != 0) 
 		return EXIT_FAILURE;
 	
 	return 0;
