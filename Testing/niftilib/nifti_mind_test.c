@@ -6,6 +6,8 @@
 #include <nifti1_io.h>
 #include <stdio.h>
 
+static int rcount = 0;
+
 nifti_image* generate_dwi_image(const char* filename, int size)
 {
 	int ii;
@@ -93,6 +95,7 @@ void generate_rawdwi_image(const char* filename, int seed)
 	nifti_image* nim = generate_dwi_image(filename, VECTOR_SIZE);
 	NiftiRawDWI data[VECTOR_SIZE];
 	
+	srand(seed);
 	for(ii = 0 ; ii < VECTOR_SIZE; ii++) {
 		int rint;
 		float* rfloat = (float*)&rint;
@@ -108,6 +111,7 @@ void generate_rawdwi_image(const char* filename, int seed)
 	}
 	
 	nifti_add_mind(nim, MIND_RAWDWI, (NiftiMindExt*)data);
+	fprintf(stderr, "Writing %s\n", nim->iname);
 	nifti_image_write(nim);
 }
 
@@ -120,6 +124,8 @@ void generate_tensor_image(const char* filename, int seed)
 	
 	nifti_image* nim = generate_dwi_image(filename, VECTOR_SIZE);
 	NiftiTensorPos data[VECTOR_SIZE];
+	
+	srand(seed);
 	for(ii = 0 ; ii < VECTOR_SIZE; ii++) {
 		data[ii].row = rand();
 		data[ii].col = rand();
@@ -138,6 +144,8 @@ void generate_dsphere_image(const char* filename, int seed)
 	
 	nifti_image* nim = generate_dwi_image(filename, VECTOR_SIZE);
 	NiftiMeshPoint data[VECTOR_SIZE];
+	
+	srand(seed);
 	for(ii = 0 ; ii < VECTOR_SIZE; ii++) {
 		int rint;
 		float* rfloat = (float*)&rint;
@@ -163,6 +171,8 @@ void generate_hsphere_image(const char* filename, int seed)
 	nifti_image* nim = generate_dwi_image(filename, VECTOR_SIZE);
 
 	NiftiSphereHarmonic data[VECTOR_SIZE];
+	
+	srand(seed);
 	for(ii = 0 ; ii < VECTOR_SIZE; ii++) {
 		data[ii].degree = rand();
 		data[ii].order = rand();
@@ -183,7 +193,7 @@ int check_image(const char* filename, int seed)
 	fprintf(stderr, "Intent: %s\n", i1->intent_name);
 	fprintf(stderr, "Num extents: %i\n", i1->num_ext);
 	if(strncmp(i1->intent_name, "MiND", 5) != 0) {
-		return EXIT_FAILURE;
+		return -1;
 	}
 
 	int ii = 0;
@@ -203,20 +213,17 @@ int check_image(const char* filename, int seed)
 				fprintf(stderr, "Raw DWI Image\n");
 				NiftiRawDWI* arr = (NiftiRawDWI*)out;
 				for(ii = 0 ; ii < i1->nu ; ii++) {
-					fprintf(stderr, "B Value: %f\n", arr[ii].bvalue);
-					irand = rand();
-					if(arr[ii].bvalue != *frand) 
-						return EXIT_FAILURE;
-
-					fprintf(stderr, "Azimuth: %f\n", arr[ii].azimuth);
 					irand = rand();
 					if(arr[ii].azimuth != *frand) 
-						return EXIT_FAILURE;
+						return -3;
 					
-					fprintf(stderr, "Zenith: %f\n" , arr[ii].zenith);
 					irand = rand();
 					if(arr[ii].zenith!= *frand) 
-						return EXIT_FAILURE;
+						return -4;
+					
+					irand = rand();
+					if(arr[ii].bvalue != *frand) 
+						return -2;
 				}
 			}
 			break;
@@ -225,13 +232,11 @@ int check_image(const char* filename, int seed)
 				fprintf(stderr, "Tensor Image\n");
 				NiftiTensorPos* arr = (NiftiTensorPos*)out;
 				for(ii = 0 ; ii < i1->nu ; ii++) {
-					fprintf(stderr, "Row: %i\n", arr[ii].row);
 					if(arr[ii].row != rand()) 
-						return EXIT_FAILURE;
+						return -5;
 					
-					fprintf(stderr, "Column: %i\n" , arr[ii].col);
-					if(arr[ii].row != rand()) 
-						return EXIT_FAILURE;
+					if(arr[ii].col != rand()) 
+						return -6;
 				}
 			}
 			break;
@@ -242,15 +247,13 @@ int check_image(const char* filename, int seed)
 				fprintf(stderr, "Discrete Spherical Lattice Image\n");
 				NiftiMeshPoint* arr = (NiftiMeshPoint*)out;
 				for(ii = 0 ; ii < i1->nu ; ii++) {
-					fprintf(stderr, "Azimuth: %f\n", arr[ii].azimuth);
 					irand = rand();
 					if(arr[ii].azimuth != *frand) 
-						return EXIT_FAILURE;
+						return -7;
 					
-					fprintf(stderr, "Zenith: %f\n" , arr[ii].zenith);
 					irand = rand();
 					if(arr[ii].zenith != *frand) 
-						return EXIT_FAILURE;
+						return -8;
 				}
 			}
 			break;
@@ -259,13 +262,11 @@ int check_image(const char* filename, int seed)
 				fprintf(stderr, "Real Spherical Harmonics Image\n");
 				NiftiSphereHarmonic* arr = (NiftiSphereHarmonic*)out;
 				for(ii = 0 ; ii < i1->nu ; ii++) {
-					fprintf(stderr, "Degree: %i\n", arr[ii].degree);
 					if(arr[ii].degree != rand()) 
-						return EXIT_FAILURE;
+						return -9;
 					
-					fprintf(stderr, "Order: %i\n", arr[ii].order);
 					if(arr[ii].order != rand()) 
-						return EXIT_FAILURE;
+						return -10;
 				}
 			}
 			break;
@@ -274,27 +275,26 @@ int check_image(const char* filename, int seed)
 	free(out);
 	nifti_image_free(i1);
 
-	return EXIT_SUCCESS;
+	return 0;
 }
 
 int main (int argc, char *argv[])
 {
 	//Raw DWI
 	generate_rawdwi_image("rawdwi.nii.gz", 13);
-	if(check_image("rawdwi.nii.gz", 13) != EXIT_SUCCESS) {
+	if(check_image("rawdwi.nii.gz", 13) != 0) 
 		return EXIT_FAILURE;
-	}
 	
 	generate_tensor_image("tensor.nii.gz", 13);
-	if(check_image("tensor.nii.gz", 13) != EXIT_SUCCESS)
+	if(check_image("tensor.nii.gz", 13) != 0)
 		return EXIT_FAILURE;
 	
 	generate_hsphere_image("hsphere.nii.gz", 13);
-	if(check_image("hsphere.nii.gz", 13) != EXIT_SUCCESS) 
+	if(check_image("hsphere.nii.gz", 13) != 0) 
 		return EXIT_FAILURE;
 	
 	generate_dsphere_image("dsphere.nii.gz", 13);
-	if(check_image("dsphere.nii.gz", 13) != EXIT_SUCCESS) 
+	if(check_image("dsphere.nii.gz", 13) != 0) 
 		return EXIT_FAILURE;
 	
 	return 0;
