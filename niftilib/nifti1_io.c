@@ -4490,16 +4490,10 @@ static int nifti_read_extensions( nifti_image *nim, znzFile fp, int remain )
  *
  * @return 0
  */
-int nifti_add_mind(nifti_image* nim, NiftiMindCode type, NiftiMindExt* mind_arr, size_t sz)
+int nifti_add_mind(nifti_image* nim, NiftiMindCode type, NiftiMindExt* mind_arr)
 {
 	int ii;
 
-	if(nim->du != sz) {
-		fprintf(stderr,"MiND Output, Trying to pass MiND extension data into "
-				"non-vector image. Set dim[5] (du) > 1.\n");
-		return -1;
-	}
-	
 	if(nim->intent_code != NIFTI_INTENT_VECTOR) {
 		fprintf(stderr,"MiND Output, Trying to pass MiND extension data into "
 				"non-vector image. Intent to 1007 (NIFTI_INTENT_VECTOR).\n");
@@ -4519,7 +4513,7 @@ int nifti_add_mind(nifti_image* nim, NiftiMindCode type, NiftiMindExt* mind_arr,
 	switch(type) {
 		case MIND_RAWDWI:
 			nifti_add_extension(nim, "RAWDWI", 7, NIFTI_ECODE_MIND_IDENT);
-			for(ii = 0 ; ii < sz; ii++) {
+			for(ii = 0 ; ii < nim->nu; ii++) {
 				nifti_add_extension(nim, (char*)&mind_arr[ii].diff_dir.bvalue,
 						sizeof(int), NIFTI_ECODE_B_VALUE);
 				nifti_add_extension(nim, (char*)&mind_arr[ii].diff_dir.azimuth,
@@ -4528,21 +4522,21 @@ int nifti_add_mind(nifti_image* nim, NiftiMindCode type, NiftiMindExt* mind_arr,
 		break;
 		case MIND_DTENSOR:
 			nifti_add_extension(nim, "DTENSOR", 8, NIFTI_ECODE_MIND_IDENT);
-			for(ii = 0 ; ii < sz; ii++) {
+			for(ii = 0 ; ii < nim->nu; ii++) {
 				nifti_add_extension(nim, (char*)&mind_arr[ii].tensor_index.row,
 						sizeof(int)*2, NIFTI_ECODE_DT_COMPONENT);
 			}
 		break;
 		case MIND_DISCSPHFUNC:
 			nifti_add_extension(nim, "DISCSPHFUNC", 12, NIFTI_ECODE_MIND_IDENT);
-			for(ii = 0 ; ii < sz; ii++) {
+			for(ii = 0 ; ii < nim->nu; ii++) {
 				nifti_add_extension(nim, (char*)&mind_arr[ii].sph_point.azimuth, 
 						sizeof(float)*2, NIFTI_ECODE_SPHERICAL_DIRECTION);
 			}
 		break;
 		case MIND_REALSPHARMCOEFFS:
 			nifti_add_extension(nim, "REALSPHARMCOEFFS", 17, NIFTI_ECODE_MIND_IDENT);
-			for(ii = 0 ; ii < sz; ii++) {
+			for(ii = 0 ; ii < nim->nu; ii++) {
 				nifti_add_extension(nim, (char*)&mind_arr[ii].sph_order.degree, 
 						sizeof(float)*2, NIFTI_ECODE_SHC_DEGREEORDER);
 			}

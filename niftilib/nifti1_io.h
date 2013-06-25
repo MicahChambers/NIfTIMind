@@ -476,8 +476,7 @@ int    valid_nifti_extensions(const nifti_image *nim);
 
 /* MiND Extension Functions */
 NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr);
-int nifti_add_mind(nifti_image* nim, NiftiMindCode type, NiftiMindExt* mind_arr,
-			size_t sz);;
+int nifti_add_mind(nifti_image* nim, NiftiMindCode type, NiftiMindExt* mind_arr);
 
 /*-------------------- Some C convenience macros ----------------------------*/
 
