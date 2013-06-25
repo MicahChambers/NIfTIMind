@@ -4565,7 +4565,7 @@ int nifti_add_mind(nifti_image* nim, NiftiMindCode type, NiftiMindExt* mind_arr)
  *
  * @return mind_code that was found, 0 = none, -1 = error
  */
-NiftiMindCode nifti_get_mind(nifti_image* nim, NiftiMindExt** mind_arr)
+NiftiMindCode nifti_get_mind(const nifti_image* nim, NiftiMindExt** mind_arr)
 {
 	if(strcmp(nim->intent_name, "MiND") != 0) 
 		return 0;
@@ -6582,6 +6582,61 @@ char *nifti_image_to_ascii( const nifti_image *nim )
    }
 
    sprintf( buf+strlen(buf) , "  num_ext = '%d'\n", nim->num_ext ) ;
+
+   //MiND Extension information
+   {
+   int ii;
+   NiftiMindExt* out = NULL;
+   NiftiMindCode res = nifti_get_mind(nim, &out);
+
+   switch(res) {
+      case MIND_RAWDWI: 
+         {
+            sprintf( buf+strlen(buf) , "  mind_extent = 'RAWDWI'\nParameters = '") ;
+            NiftiRawDWI* arr = (NiftiRawDWI*)out;
+            for(ii = 0 ; ii < nim->nu ; ii++) {
+               sprintf( buf+strlen(buf), "%f ", arr[ii].bvalue);
+               sprintf( buf+strlen(buf), "%f ", arr[ii].azimuth);
+               sprintf( buf+strlen(buf), "%f ", arr[ii].zenith);
+            }
+         }
+         break;
+      case MIND_DTENSOR:
+         {
+            sprintf( buf+strlen(buf) , "  mind_extent = 'DTENSOR'\nParameters = '") ;
+            NiftiTensorPos* arr = (NiftiTensorPos*)out;
+            for(ii = 0 ; ii < nim->nu ; ii++) {
+               sprintf( buf+strlen(buf), "%i ", arr[ii].row);
+               sprintf( buf+strlen(buf), "%i ", arr[ii].col);
+            }
+         }
+         break;
+      case MIND_DISCSPHFUNC:
+         {
+            sprintf( buf+strlen(buf) , "  mind_extent = 'DISCSPHFUNC'\nParameters = '") ;
+            NiftiMeshPoint* arr = (NiftiMeshPoint*)out;
+            for(ii = 0 ; ii < nim->nu ; ii++) {
+               sprintf( buf+strlen(buf), "%f ", arr[ii].azimuth);
+               sprintf( buf+strlen(buf), "%f ", arr[ii].zenith);
+            }
+         }
+         break;
+      case MIND_REALSPHARMCOEFFS:
+         {
+            sprintf( buf+strlen(buf) , "  mind_extent = 'REALSPHARMCOEFFS'\nParameters = '") ;
+            NiftiSphereHarmonic* arr = (NiftiSphereHarmonic*)out;
+            for(ii = 0 ; ii < nim->nu ; ii++) {
+               sprintf( buf+strlen(buf), "%i ", arr[ii].degree);
+               sprintf( buf+strlen(buf), "%i ", arr[ii].order);
+            }
+         }
+         break;
+   }
+   sprintf( buf+strlen(buf) , "'\n") ;
+
+
+   if(out) free(out);
+   }
 
    sprintf( buf+strlen(buf) , "/>\n" ) ;   /* XML-ish closer */
 

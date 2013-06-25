@@ -189,6 +189,8 @@ int check_image(const char* filename, int seed)
 	 */
 	nifti_set_debug_level(2);
 	nifti_image *i1 = nifti_image_read(filename, 0);
+	nifti_image_infodump(i1);
+
 	fprintf(stderr, "Valid Nifti Extensions = %i\n", valid_nifti_extensions(i1));
 	fprintf(stderr, "Intent: %s\n", i1->intent_name);
 	fprintf(stderr, "Num extents: %i\n", i1->num_ext);
